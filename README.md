@@ -18,6 +18,7 @@ Add this line to your app's `build.gradle` inside the `dependencies` section:
 
 If you're planning on optimizing your app with ProGuard, make sure that you exclude the Paymentez bindings. You can do this by adding the following to your app's `proguard.cfg` file:
 
+    -dontwarn com.paymentez.android.**
     -keep class com.paymentez.android.** { *; }
 
 ## Usage
