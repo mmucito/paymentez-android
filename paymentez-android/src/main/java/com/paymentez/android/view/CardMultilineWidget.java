@@ -1,5 +1,6 @@
 package com.paymentez.android.view;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.TypedArray;
@@ -20,6 +21,7 @@ import android.support.v4.app.FragmentManager;
 import android.support.v4.graphics.drawable.DrawableCompat;
 import android.text.InputFilter;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -56,11 +58,11 @@ public class CardMultilineWidget extends LinearLayout {
 
     private @Nullable
     CardInputListener mCardInputListener;
-    private CardNumberEditText mCardNumberEditText;
-    private ExpiryDateEditText mExpiryDateEditText;
-    private PaymentezEditText mCvcEditText;
-    private PaymentezEditText mPostalCodeEditText;
-    private PaymentezEditText mCardHolderNameEditText;
+    private static CardNumberEditText mCardNumberEditText;
+    private static ExpiryDateEditText mExpiryDateEditText;
+    private static PaymentezEditText mCvcEditText;
+    private static PaymentezEditText mPostalCodeEditText;
+    private static PaymentezEditText mCardHolderNameEditText;
     private TextInputLayout mCardNumberTextInputLayout;
     private TextInputLayout mExpiryTextInputLayout;
     private TextInputLayout mCvcTextInputLayout;
@@ -70,17 +72,18 @@ public class CardMultilineWidget extends LinearLayout {
     private ImageView imageViewPaymentezLogo;
 
     private boolean mIsEnabled;
-    private boolean mShouldShowPostalCode;
-    private boolean mShouldShowCardHolderName;
+    private static boolean mShouldShowPostalCode;
+    private static boolean mShouldShowCardHolderName;
     private boolean mShouldShowScanCard;
     private boolean mShouldShowPaymentezLogo;
     private boolean mHasAdjustedDrawable;
 
-    private int MY_SCAN_REQUEST_CODE = 10344;
+    private static int MY_SCAN_REQUEST_CODE = 10344;
 
     private @DrawableRes
     int mCachedIconResource;
     private @Card.CardBrand
+    static
     String mCardBrand;
     private @ColorInt
     int mTintColorInt;
@@ -151,7 +154,7 @@ public class CardMultilineWidget extends LinearLayout {
      *
      * @return {@code true} if all shown fields are valid, {@code false} otherwise
      */
-    public boolean validateAllFields() {
+    public static boolean validateAllFields() {
         boolean cardNumberIsValid =
                 CardUtils.isValidCardNumber(mCardNumberEditText.getCardNumber());
         boolean expiryIsValid = mExpiryDateEditText.getValidDateFields() != null &&
@@ -339,6 +342,67 @@ public class CardMultilineWidget extends LinearLayout {
         return pixels.intValue();
     }
 
+
+    public static void myStartActivityForResult(FragmentActivity act, Intent in, int requestCode, OnActivityResult cb) {
+        Fragment aux = new FragmentForResult(cb);
+        FragmentManager fm = act.getSupportFragmentManager();
+        fm.beginTransaction().add(aux, "FRAGMENT_TAG").commit();
+        fm.executePendingTransactions();
+        aux.startActivityForResult(in, requestCode);
+    }
+
+    public interface OnActivityResult {
+        void onActivityResult(int requestCode, int resultCode, Intent data);
+    }
+
+    @SuppressLint("ValidFragment")
+    public static class FragmentForResult extends Fragment {
+        private OnActivityResult cb;
+        public FragmentForResult(OnActivityResult cb) {
+            this.cb = cb;
+        }
+
+        @Override
+        public void onActivityResult(int requestCode, int resultCode, Intent data) {
+            if (cb != null)
+                cb.onActivityResult(requestCode, resultCode, data);
+
+
+            if (requestCode == MY_SCAN_REQUEST_CODE) {
+
+                if (data != null && data.hasExtra(CardIOActivity.EXTRA_SCAN_RESULT)) {
+                    CreditCard scanResult = data.getParcelableExtra(CardIOActivity.EXTRA_SCAN_RESULT);
+
+                    if(scanResult.cardNumber!=null) {
+                        mCardNumberEditText.setText(scanResult.cardNumber);
+                    }
+                    if(scanResult.cardholderName!=null){
+                        mCardHolderNameEditText.setText(scanResult.cardholderName);
+                    }
+
+                    if(scanResult.cvv!=null){
+                        mCvcEditText.setText(scanResult.cvv);
+                    }
+
+                    if(scanResult.expiryMonth > 0 && scanResult.expiryYear > 0){
+
+                        mExpiryDateEditText.setText(String.format(Locale.ENGLISH, "%02d", scanResult.expiryMonth)+"/"+ (""+scanResult.expiryYear).substring(2));
+                    }
+
+                    validateAllFields();
+
+                }
+
+            }
+
+
+            super.onActivityResult(requestCode, resultCode, data);
+            getActivity().getSupportFragmentManager().beginTransaction().remove(this).commit();
+        }
+    }
+
+
+
     private void initView(AttributeSet attrs) {
         setOrientation(VERTICAL);
         inflate(getContext(), R.layout.card_multiline_widget, this);
@@ -349,43 +413,6 @@ public class CardMultilineWidget extends LinearLayout {
         imageButtonScanCard = (ImageButton) findViewById(R.id.imageButtonScanCard);
         imageButtonScanCard.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                final FragmentManager fm = ((FragmentActivity) getContext()).getSupportFragmentManager();
-                Fragment auxiliary = new Fragment() {
-                    @Override
-                    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-                        if (requestCode == MY_SCAN_REQUEST_CODE) {
-
-                            if (data != null && data.hasExtra(CardIOActivity.EXTRA_SCAN_RESULT)) {
-                                CreditCard scanResult = data.getParcelableExtra(CardIOActivity.EXTRA_SCAN_RESULT);
-
-                                if(scanResult.cardNumber!=null) {
-                                    mCardNumberEditText.setText(scanResult.cardNumber);
-                                }
-                                if(scanResult.cardholderName!=null){
-                                    mCardHolderNameEditText.setText(scanResult.cardholderName);
-                                }
-
-                                if(scanResult.cvv!=null){
-                                    mCvcEditText.setText(scanResult.cvv);
-                                }
-
-                                if(scanResult.expiryMonth > 0 && scanResult.expiryYear > 0){
-
-                                    mExpiryDateEditText.setText(String.format(Locale.ENGLISH, "%02d", scanResult.expiryMonth)+"/"+ (""+scanResult.expiryYear).substring(2));
-                                }
-
-                                validateAllFields();
-
-                            }
-
-                        }
-
-                        super.onActivityResult(requestCode, resultCode, data);
-                        fm.beginTransaction().remove(this).commit();
-                    }
-                };
-                fm.beginTransaction().add(auxiliary, "FRAGMENT_TAG").commit();
-                fm.executePendingTransactions();
 
                 Intent scanIntent = new Intent(mContext, CardIOActivity.class);
 
@@ -399,8 +426,8 @@ public class CardMultilineWidget extends LinearLayout {
                 scanIntent.putExtra(CardIOActivity.EXTRA_KEEP_APPLICATION_THEME, true);
                 scanIntent.putExtra(CardIOActivity.EXTRA_SUPPRESS_CONFIRMATION, true);
 
-                // MY_SCAN_REQUEST_CODE is arbitrary and is only used within this activity.
-                auxiliary.startActivityForResult(scanIntent, MY_SCAN_REQUEST_CODE);
+                myStartActivityForResult((FragmentActivity) getContext(),
+                        scanIntent, MY_SCAN_REQUEST_CODE, null);
 
             }
         });
