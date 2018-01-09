@@ -565,7 +565,7 @@ public class CardMultilineWidget extends LinearLayout {
         mExpiryDateEditText.setErrorMessage(getContext().getString(R.string.invalid_expiry_year));
         mCvcEditText.setErrorMessage(getContext().getString(R.string.invalid_cvc));
         mPostalCodeEditText.setErrorMessage(getContext().getString(R.string.invalid_zip));
-        mPostalCodeEditText.setErrorMessage(getContext().getString(R.string.invalid_cardholdername));
+
     }
 
     private void initFocusChangeListeners() {
